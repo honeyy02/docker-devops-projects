@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Check Docker') {
+            steps {
+                sh 'docker --version'
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t maven-app:latest .'
+            }
+        }
+
+        stage('Create Volume') {
+            steps {
+                sh 'docker volume create my-volume || true'
+            }
+        }
+
+        stage('Stop & Remove Old Container') {
+            steps {
+                sh 'docker stop maven-app-container || true'
+                sh 'docker rm maven-app-container || true'
+            }
+        }
+
+        stage('Run Container with Volume') {
+            steps {
+                sh '''
+                docker run -d \
+                --name maven-app-container \
+                -p 8081:8080 \
+                -v my-volume:/app/target \
+                maven-app:latest
+                '''
+            }
+        }
+    }
+}
