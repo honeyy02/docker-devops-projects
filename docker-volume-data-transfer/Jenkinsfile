@@ -1,0 +1,65 @@
+pipeline {
+    agent any
+
+    environment {
+        VOLUME_NAME = 'my-volume'
+    }
+
+    stages {
+        stage('Create Local Directory') {
+            steps {
+                sh 'mkdir -p jar-file'
+            }
+        }
+
+        stage('Get Volume Path') {
+            steps {
+                script {
+                    def volumeInspectOutput = sh(
+                        script: "docker volume inspect ${env.VOLUME_NAME}",
+                        returnStdout: true
+                    ).trim()
+
+                    def volumePath = sh(
+                        script: "echo '${volumeInspectOutput}' | jq -r '.[0].Mountpoint'",
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Volume Path: ${volumePath}"
+                    env.VOLUME_PATH = volumePath
+                }
+            }
+        }
+
+        stage('Copy Data from Volume') {
+            steps {
+                sh '''
+                docker run --rm \
+                -v ${VOLUME_NAME}:/volume \
+                -v $(pwd)/jar-file:/jar-file \
+                alpine sh -c 'cp -r /volume/* /jar-file/'
+                '''
+
+                sh "ls -l jar-file/"
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t honeyy02/assignment2:latest .'
+            }
+        }
+
+        stage('Run Container') {
+            steps {
+                sh 'docker run -d --rm honeyy02/assignment2:latest'
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
